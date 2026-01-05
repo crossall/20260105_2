@@ -1,186 +1,59 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>오늘의 할 일</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-    }
+<div>Teachable Machine Image Model</div>
+<button type="button" onclick="init()">Start</button>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    // More API functions here:
+    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
 
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    // the link to your model provided by Teachable Machine export panel
+    const URL = "https://teachablemachine.withgoogle.com/models/_YhtGMsfK/";
 
-    .app-container {
-      width: 100%;
-      max-width: 480px;
-      padding: 24px;
-    }
+    let model, webcam, labelContainer, maxPredictions;
 
-    .card {
-      background: rgba(255, 255, 255, 0.2);
-      backdrop-filter: blur(16px);
-      border-radius: 20px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-      padding: 28px 24px 20px;
-      color: #fff;
-    }
+    // Load the image model and setup the webcam
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
 
-    h1 {
-      margin: 0 0 18px 0;
-      font-size: 1.6rem;
-      letter-spacing: -0.3px;
-    }
+        // load the model and metadata
+        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+        // or files from your local hard drive
+        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-    .input-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-    }
+        // Convenience function to setup a webcam
+        const flip = true; // whether to flip the webcam
+        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        await webcam.play();
+        window.requestAnimationFrame(loop);
 
-    input[type="text"] {
-      flex: 1;
-      padding: 10px 14px;
-      border-radius: 14px;
-      border: none;
-      outline: none;
-      font-size: 0.95rem;
-    }
-
-    button.add-btn {
-      padding: 10px 16px;
-      border-radius: 14px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
-    }
-
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      max-height: 340px;
-      overflow-y: auto;
-    }
-
-    li {
-      background: rgba(255,255,255,0.15);
-      padding: 10px 12px;
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      transition: transform .15s ease, opacity .15s ease;
-    }
-
-    .task-text {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      word-break: keep-all;
-      overflow-wrap: anywhere;
-    }
-
-    .task-text.checked label {
-      text-decoration: line-through;
-      opacity: .7;
-    }
-
-    .empty-msg {
-      text-align: center;
-      font-size: 0.9rem;
-      opacity: .85;
-      margin-top: 12px;
-    }
-
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.4);
-      border-radius: 6px;
-    }
-  </style>
-</head>
-<body>
-  <div class="app-container">
-    <div class="card">
-      <h1>오늘의 할 일</h1>
-      <div class="input-row">
-        <input id="task-input" type="text" placeholder="할 일을 입력하세요" />
-        <button class="add-btn" id="add-btn">추가</button>
-      </div>
-      <ul id="task-list"></ul>
-      <p id="empty" class="empty-msg">할 일이 없습니다. 새로 추가해 보세요 ✨</p>
-    </div>
-  </div>
-
-  <script>
-    const input = document.getElementById('task-input');
-    const addBtn = document.getElementById('add-btn');
-    const list = document.getElementById('task-list');
-    const emptyMsg = document.getElementById('empty');
-
-    function toggleEmpty() {
-      emptyMsg.style.display = list.children.length === 0 ? 'block' : 'none';
-    }
-
-    function addTask() {
-      const text = input.value.trim();
-      if (!text) return;
-
-      const li = document.createElement('li');
-
-      const left = document.createElement('div');
-      left.className = 'task-text';
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-
-      const label = document.createElement('label');
-      label.textContent = text;
-
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          li.style.opacity = '0';
-          li.style.transform = 'translateX(10px)';
-          setTimeout(() => {
-            li.remove();
-            toggleEmpty();
-          }, 180);
+        // append elements to the DOM
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
         }
-      });
-
-      left.appendChild(checkbox);
-      left.appendChild(label);
-
-      li.appendChild(left);
-      list.appendChild(li);
-
-      input.value = '';
-      input.focus();
-      toggleEmpty();
     }
 
-    addBtn.addEventListener('click', addTask);
+    async function loop() {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
 
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        addTask();
-      }
-    });
-
-    toggleEmpty();
-  </script>
-</body>
-</html>
+    // run the webcam image through the image model
+    async function predict() {
+        // predict can take in an image, video or canvas html element
+        const prediction = await model.predict(webcam.canvas);
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
+        }
+    }
+</script>
